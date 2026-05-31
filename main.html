@@ -2,408 +2,149 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ninja Jutsu Vision</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { background:#000; overflow:hidden; font-family:monospace; user-select:none; }
-
-#webcam {
-  position:absolute; inset:0;
-  width:100%; height:100%;
-  object-fit:cover;
-  transform:scaleX(-1);
-}
-
-#canvas {
-  position:absolute; inset:0;
-  width:100%; height:100%;
-  pointer-events:none;
-  z-index:2;
-}
-
-.jutsu-vid {
-  position:absolute;
-  pointer-events:none;
-  display:none;
-  mix-blend-mode:screen;
-  transform:translate(-50%, -50%);
-  z-index:3;
-  border-radius:50%;
-  filter: brightness(1.4) saturate(1.3);
-}
-
-#hud {
-  position:absolute; inset:0;
-  pointer-events:none;
-  z-index:10;
-  color:#fff;
-}
-#mode-label {
-  position:absolute; top:18px; right:22px;
-  font-size:20px; font-weight:bold; letter-spacing:2px;
-  text-shadow:0 0 14px currentColor;
-}
-
-.charge-bar {
-  position:absolute; bottom:28px;
-  display:none;
-}
-#charge-left  { left:18px; }
-#charge-right { right:18px; text-align:right; }
-.charge-bar .c-lbl { font-size:11px; margin-bottom:3px; letter-spacing:1px; }
-.charge-bar .c-bg  { width:120px; height:8px; background:#333; border-radius:4px; overflow:hidden; }
-.charge-bar .c-fill{ height:100%; width:0%; border-radius:4px; transition:width 0.04s linear; }
-
-#charge-left .c-lbl  { color:#ffd050; }
-#charge-left .c-fill { background:#ffd050; }
-#charge-right .c-lbl  { color:#50e8ff; }
-#charge-right .c-fill { background:#50e8ff; }
-
-#fps-label  { position:absolute; bottom:12px; right:14px; font-size:11px; color:#444; }
-#hint-label { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); font-size:11px; color:#555; white-space:nowrap; }
-#manual-lbl { position:absolute; top:50px; left:14px; font-size:12px; color:#00d4ff; display:none; }
-
-#start-screen {
-  position:absolute; inset:0;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background:#050505; z-index:50;
-}
-#start-screen h1 { color:#ffd050; font-size:28px; letter-spacing:4px; margin-bottom:16px; }
-#start-screen p  { color:#888; font-size:13px; margin:5px 0; letter-spacing:1px; }
-.key { color:#ffd050; }
-.key2 { color:#50e8ff; }
-#start-btn {
-  margin-top:32px; padding:12px 40px;
-  background:transparent; border:1px solid #ffd050;
-  color:#ffd050; font-size:15px; font-family:monospace;
-  letter-spacing:2px; cursor:pointer; transition:background 0.2s;
-}
-#start-btn:hover { background:rgba(255,208,80,0.12); }
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;}
+#webcam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+#canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;}
+.jutsu-vid{position:absolute;pointer-events:none;display:none;mix-blend-mode:screen;transform:translate(-50%,-50%);z-index:3;filter:brightness(1.4) saturate(1.3);}
+#label-left{position:absolute;bottom:28px;left:28px;font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:3px;color:#fff;text-shadow:0 0 14px #fff;opacity:0;transition:opacity 0.2s;z-index:10;pointer-events:none;}
+#label-right{position:absolute;bottom:28px;right:28px;font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:3px;color:#fff;text-shadow:0 0 14px #fff;opacity:0;transition:opacity 0.2s;z-index:10;pointer-events:none;}
 </style>
 </head>
 <body>
-
 <video id="webcam" autoplay playsinline muted></video>
 <canvas id="canvas"></canvas>
-
-<video id="ras-vid" class="jutsu-vid" muted autoplay loop playsinline
-  src="assets/videoplayback (2).mp4"></video>
-
-<video id="rsh-vid" class="jutsu-vid" muted autoplay loop playsinline
-  src="assets/videoplayback.mp4"></video>
-
-<div id="hud">
-  <div id="mode-label"></div>
-
-  <div class="charge-bar" id="charge-left">
-    <div class="c-lbl">LEFT · RASENGAN  0%</div>
-    <div class="c-bg"><div class="c-fill"></div></div>
-  </div>
-
-  <div class="charge-bar" id="charge-right">
-    <div class="c-lbl">RIGHT · RASENSHURIKEN  0%</div>
-    <div class="c-bg"><div class="c-fill"></div></div>
-  </div>
-
-  <div id="fps-label">-- FPS</div>
-  <div id="hint-label"> LEFT hand open = Rasengan &nbsp;|&nbsp; RIGHT hand open = Rasenshuriken</div>
-  <div id="manual-lbl">MANUAL</div>
-  <div id="debug-lbl" style="position:absolute;top:60px;left:14px;font-size:13px;color:#0f0;line-height:1.6;"></div>
-</div>
-
-<div id="start-screen">
-  <h1>NINJA JUTSU VISION</h1>
-  <p> Open <span class="key">LEFT</span> hand → <span class="key">RASENGAN</span></p>
-  <p> Open <span class="key2">RIGHT</span> hand → <span class="key2">RASENSHURIKEN</span></p>
-  <p> Both hands open → <span class="key">Both jutsu simultaneously</span></p>
-  <p>Close your hand to dismiss the effect</p>
-  <p style="margin-top:12px;color:#555;">M = cycle manual mode &nbsp;|&nbsp; Q / ESC = quit</p>
-  <button id="start-btn" onclick="startApp()">ACTIVATE JUTSU</button>
-</div>
-
+<video id="ras-vid" class="jutsu-vid" muted autoplay loop playsinline src="assets/videoplayback (2).mp4"></video>
+<video id="rsh-vid" class="jutsu-vid" muted autoplay loop playsinline src="assets/videoplayback.mp4"></video>
+<div id="label-left">RASENGAN</div>
+<div id="label-right">RASENSHURIKEN</div>
 <script>
-const webcam    = document.getElementById('webcam');
-const canvas    = document.getElementById('canvas');
-const ctx       = canvas.getContext('2d');
-const rasVid    = document.getElementById('ras-vid');
-const rshVid    = document.getElementById('rsh-vid');
-const modeLabel = document.getElementById('mode-label');
-const fpsLbl    = document.getElementById('fps-label');
-const manLbl    = document.getElementById('manual-lbl');
-const debugLbl  = document.getElementById('debug-lbl');
+const webcam   = document.getElementById('webcam');
+const canvas   = document.getElementById('canvas');
+const ctx      = canvas.getContext('2d');
+const rasVid   = document.getElementById('ras-vid');
+const rshVid   = document.getElementById('rsh-vid');
+const lblLeft  = document.getElementById('label-left');
+const lblRight = document.getElementById('label-right');
+const TWO_PI   = Math.PI*2;
 
-const chargeLeftEl  = document.getElementById('charge-left');
-const chargeRightEl = document.getElementById('charge-right');
+const feed     = document.createElement('canvas');
+const feedCtx  = feed.getContext('2d');
 
-const TWO_PI = Math.PI * 2;
+const TIPS  = [4,8,12,16,20];
+const MCPS  = [2,5,9,13,17];
+const CONN  = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,5],[0,17]];
+const FACES = [[0,1,5],[1,2,5],[2,5,9],[5,6,9],[6,7,9],[7,8,12],[9,10,12],[10,11,12],[0,5,17],[5,9,13],[9,13,17],[13,14,17],[14,15,17],[15,16,20],[17,18,20],[18,19,20]];
 
-const FINGER_TIPS = [4, 8, 12, 16, 20];
-const FINGER_MCPS = [2, 5,  9, 13, 17];
-const CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [0,9],[9,10],[10,11],[11,12],
-  [0,13],[13,14],[14,15],[15,16],
-  [0,17],[17,18],[18,19],[19,20],
-  [5,9],[9,13],[13,17],[0,5],[0,17]
-];
-const FACES = [
-  [0,1,5],[1,2,5],[2,5,9],[5,6,9],[6,7,9],
-  [7,8,12],[9,10,12],[10,11,12],[0,5,17],
-  [5,9,13],[9,13,17],[13,14,17],[14,15,17],
-  [15,16,20],[17,18,20],[18,19,20]
-];
+let rasCharge=0,rshCharge=0;
+let lastRasPalm=[0,0],lastRshPalm=[0,0];
+let prevTime=performance.now();
 
-let manualMode = null;
-let rasCharge  = 0;   
-let rshCharge  = 0;   
-let prevTime   = performance.now();
-let fpsSmooth  = 30;
-let lastRasPalm = [0, 0];
-let lastRshPalm = [0, 0];
-
-function lm2display(lms) {
-  const W    = window.innerWidth;
-  const H    = window.innerHeight;
-  const camW = webcam.videoWidth  || 1280;
-  const camH = webcam.videoHeight || 720;
-
-  const scaleX_fit = W / camW;
-  const scaleY_fit = H / camH;
-  const scale = Math.max(scaleX_fit, scaleY_fit);
-
-  const renderW = camW * scale;
-  const renderH = camH * scale;
-  const offX    = (W - renderW) / 2;
-  const offY    = (H - renderH) / 2;
-
-  return lms.map(l => {
-    const mx = (1 - l.x) * renderW + offX;
-    const my =       l.y  * renderH + offY;
-    return [mx, my];
-  });
+function lm2display(lms){
+  const W=innerWidth,H=innerHeight,cW=webcam.videoWidth||1280,cH=webcam.videoHeight||720;
+  const sc=Math.max(W/cW,H/cH),rW=cW*sc,rH=cH*sc,ox=(W-rW)/2,oy=(H-rH)/2;
+  return lms.map(l=>[(1-l.x)*rW+ox,l.y*rH+oy]);
 }
-
-function palmCenter(px) {
-  const pts = [px[0], ...FINGER_MCPS.map(i => px[i])];
-  return [
-    pts.reduce((s,p) => s + p[0], 0) / pts.length,
-    pts.reduce((s,p) => s + p[1], 0) / pts.length
-  ];
+function palmCenter(px){
+  const pts=[px[0],...MCPS.map(i=>px[i])];
+  return[pts.reduce((s,p)=>s+p[0],0)/pts.length,pts.reduce((s,p)=>s+p[1],0)/pts.length];
 }
-
-function isOpen(lms) {
-  let up = 0;
-  for (let i = 1; i < FINGER_TIPS.length; i++) {
-    if (lms[FINGER_TIPS[i]].y < lms[FINGER_MCPS[i]].y) up++;
-  }
-  if (Math.abs(lms[4].x - lms[2].x) > 0.07) up++;
-  return up >= 3;
+function isOpen(lms){
+  let up=0;
+  for(let i=1;i<TIPS.length;i++) if(lms[TIPS[i]].y<lms[MCPS[i]].y) up++;
+  if(Math.abs(lms[4].x-lms[2].x)>0.07) up++;
+  return up>=3;
 }
-
-function isFist(lms) {
-  let curled = 0;
-  for (let i = 1; i < FINGER_TIPS.length; i++) {
-    if (lms[FINGER_TIPS[i]].y > lms[FINGER_MCPS[i]].y) curled++;
-  }
-  return curled >= 3;
+function isFist(lms){
+  let c=0;
+  for(let i=1;i<TIPS.length;i++) if(lms[TIPS[i]].y>lms[MCPS[i]].y) c++;
+  return c>=3;
 }
-
-function drawHandMesh(px) {
-  const lineColor = '#00d450';
-  const glowColor = '#00ff80';
-  const dotColor  = '#00ff64';
-  const fillColor = '#003a00';
-
-  ctx.save();
-  ctx.globalAlpha = 0.22;
-  ctx.fillStyle = fillColor;
-  for (const [a,b,c] of FACES) {
-    ctx.beginPath();
-    ctx.moveTo(px[a][0], px[a][1]);
-    ctx.lineTo(px[b][0], px[b][1]);
-    ctx.lineTo(px[c][0], px[c][1]);
-    ctx.closePath();
-    ctx.fill();
-  }
+function drawHandMesh(px){
+  ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle='#003a00';
+  for(const[a,b,c]of FACES){ctx.beginPath();ctx.moveTo(px[a][0],px[a][1]);ctx.lineTo(px[b][0],px[b][1]);ctx.lineTo(px[c][0],px[c][1]);ctx.closePath();ctx.fill();}
   ctx.restore();
-
-  ctx.save();
-  ctx.globalAlpha = 0.92;
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth   = 2;
-  ctx.shadowBlur  = 10;
-  ctx.shadowColor = glowColor;
-  for (const [a,b] of CONNECTIONS) {
-    ctx.beginPath();
-    ctx.moveTo(px[a][0], px[a][1]);
-    ctx.lineTo(px[b][0], px[b][1]);
-    ctx.stroke();
-  }
+  ctx.save();ctx.strokeStyle='#00d450';ctx.lineWidth=2;ctx.shadowBlur=10;ctx.shadowColor='#00ff80';
+  for(const[a,b]of CONN){ctx.beginPath();ctx.moveTo(px[a][0],px[a][1]);ctx.lineTo(px[b][0],px[b][1]);ctx.stroke();}
   ctx.restore();
-
-  ctx.save();
-  ctx.shadowBlur  = 6;
-  ctx.shadowColor = glowColor;
-  for (const pt of px) {
-    ctx.beginPath();
-    ctx.arc(pt[0], pt[1], 4, 0, TWO_PI);
-    ctx.fillStyle   = dotColor;
-    ctx.fill();
-    ctx.lineWidth   = 1.5;
-    ctx.strokeStyle = lineColor;
-    ctx.stroke();
-  }
+  ctx.save();ctx.shadowBlur=6;ctx.shadowColor='#00ff80';
+  for(const pt of px){ctx.beginPath();ctx.arc(pt[0],pt[1],4,0,TWO_PI);ctx.fillStyle='#00ff64';ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#00d450';ctx.stroke();}
   ctx.restore();
 }
-
-function placeVid(vid, cx, cy, baseSize, charge, liftPx) {
-  const sz = Math.round(baseSize * (0.7 + 0.6 * charge));
-  vid.style.width   = sz + 'px';
-  vid.style.left    = cx + 'px';
-  vid.style.top     = (cy - liftPx) + 'px';
-  vid.style.display = 'block';
-  vid.style.opacity = Math.min(1, 0.6 + charge * 0.5).toFixed(3);
+function placeVid(vid,cx,cy,baseSize,charge,liftPx){
+  const sz=Math.round(baseSize*(0.7+0.6*charge));
+  vid.style.width=sz+'px';
+  vid.style.left=cx+'px';
+  vid.style.top=(cy-liftPx)+'px';
+  vid.style.display='block';
+  vid.style.opacity=Math.min(1,0.6+charge*0.5).toFixed(3);
 }
+function onResults(res){
+  const now=performance.now();
+  const dt=Math.min((now-prevTime)/1000,0.05);
+  prevTime=now;
+  canvas.width=innerWidth;canvas.height=innerHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-function updateChargeBar(el, charge, label) {
-  if (charge > 0.02) {
-    el.style.display = 'block';
-    el.querySelector('.c-lbl').textContent = label + '  ' + Math.round(charge * 100) + '%';
-    el.querySelector('.c-fill').style.width = (charge * 100) + '%';
-  } else {
-    el.style.display = 'none';
-  }
-}
-
-function onResults(res) {
-  const now = performance.now();
-  const dt  = Math.min((now - prevTime) / 1000, 0.05);
-  prevTime  = now;
-  fpsSmooth = fpsSmooth * 0.85 + (1 / Math.max(dt, 0.001)) * 0.15;
-  fpsLbl.textContent = Math.round(fpsSmooth) + ' FPS';
-
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  let leftHandData  = null;
-  let rightHandData = null;
-
-  if (res.multiHandLandmarks && res.multiHandedness) {
-    res.multiHandLandmarks.forEach((lms, i) => {
-      const mpLabel = res.multiHandedness[i].label;
-      const px   = lm2display(lms);
-      const palm = palmCenter(px);
-      const open = isOpen(lms);
-      const fist = isFist(lms);
-
-      if (mpLabel === 'Right') {
-        leftHandData  = { px, palm, open, fist, lms };
-      } else {
-        rightHandData = { px, palm, open, fist, lms };
-      }
+  let L=null,R=null;
+  if(res.multiHandLandmarks&&res.multiHandedness){
+    res.multiHandLandmarks.forEach((lms,i)=>{
+      const px=lm2display(lms),palm=palmCenter(px),open=isOpen(lms),fist=isFist(lms);
+      if(res.multiHandedness[i].label==='Right') L={px,palm,open,fist,lms};
+      else R={px,palm,open,fist,lms};
     });
   }
+  if(L) drawHandMesh(L.px);
+  if(R) drawHandMesh(R.px);
 
-  if (leftHandData)  drawHandMesh(leftHandData.px);
-  if (rightHandData) drawHandMesh(rightHandData.px);
+  const rasActive=L&&L.open&&!L.fist;
+  const rshActive=R&&R.open&&!R.fist;
 
-  let dbg = '';
-  if (res.multiHandLandmarks && res.multiHandedness) {
-    res.multiHandLandmarks.forEach((lms, i) => {
-      const raw = res.multiHandedness[i].label;
-      const o = isOpen(lms);
-      const f = isFist(lms);
-      dbg += `MP[${i}] raw="${raw}" open=${o} fist=${f}<br>`;
-    });
-  }
-  dbg += `rasCharge=${rasCharge.toFixed(2)} rshCharge=${rshCharge.toFixed(2)}<br>`;
-  dbg += `leftHandData=${leftHandData?'YES':'null'} rightHandData=${rightHandData?'YES':'null'}`;
-  debugLbl.innerHTML = dbg;
+  if(rasActive) rasCharge=Math.min(1,rasCharge+dt*0.7);
+  else          rasCharge=Math.max(0,rasCharge-dt*3);
+  if(rshActive) rshCharge=Math.min(1,rshCharge+dt*0.7);
+  else          rshCharge=Math.max(0,rshCharge-dt*3);
 
-  let rasActive = manualMode === 'R' ? true :
-                  manualMode === 'S' ? false :
-                  (leftHandData !== null && leftHandData.open && !leftHandData.fist);
+  if(L) lastRasPalm=L.palm;
+  if(R) lastRshPalm=R.palm;
 
-  let rshActive = manualMode === 'S' ? true :
-                  manualMode === 'R' ? false :
-                  (rightHandData !== null && rightHandData.open && !rightHandData.fist);
+  rasVid.style.display='none';
+  rshVid.style.display='none';
+  if(rasCharge>0.01) placeVid(rasVid,lastRasPalm[0],lastRasPalm[1],460,rasCharge,170+rasCharge*80);
+  if(rshCharge>0.01) placeVid(rshVid,lastRshPalm[0],lastRshPalm[1],580,rshCharge,180+rshCharge*90);
 
-  const RAMP_UP   = 0.7;
-  const RAMP_DOWN = 3.0;  
-  if (rasActive) rasCharge = Math.min(1, rasCharge + dt * RAMP_UP);
-  else           rasCharge = Math.max(0, rasCharge - dt * RAMP_DOWN);
-
-  if (rshActive) rshCharge = Math.min(1, rshCharge + dt * RAMP_UP);
-  else           rshCharge = Math.max(0, rshCharge - dt * RAMP_DOWN);
-
-  if (leftHandData)  lastRasPalm = leftHandData.palm;
-  if (rightHandData) lastRshPalm = rightHandData.palm;
-
-  rasVid.style.display = 'none';
-  rshVid.style.display = 'none';
-
-  if (rasCharge > 0.01) {
-    const [cx, cy] = lastRasPalm;
-    const liftPx = 170 + rasCharge * 80;
-    placeVid(rasVid, cx, cy, 460, rasCharge, liftPx);
-  }
-  if (rshCharge > 0.01) {
-    const [cx, cy] = lastRshPalm;
-    const liftPx = 180 + rshCharge * 90;
-    placeVid(rshVid, cx, cy, 580, rshCharge, liftPx);
-  }
-
-  const parts = [];
-  if (rasActive) parts.push('⚡ RASENGAN');
-  if (rshActive) parts.push('🌀 RASENSHURIKEN');
-  if (!leftHandData && !rightHandData) parts.push('NO HANDS DETECTED');
-  else if (!rasActive && !rshActive && (leftHandData || rightHandData)) parts.push('MAKE A FIST TO DISMISS');
-  modeLabel.textContent = parts.join('   ');
-  modeLabel.style.color = (rasActive && rshActive) ? '#ffd050' :
-                           rasActive               ? '#ffd050' :
-                           rshActive               ? '#50e8ff' : '#666';
-
-  updateChargeBar(chargeLeftEl,  rasCharge, 'LEFT · RASENGAN');
-  updateChargeBar(chargeRightEl, rshCharge, 'RIGHT · RASENSHURIKEN');
-  manLbl.style.display = manualMode ? 'block' : 'none';
+  lblLeft.style.opacity  = rasCharge>0.01 ? Math.min(1,rasCharge*2).toFixed(3) : 0;
+  lblRight.style.opacity = rshCharge>0.01 ? Math.min(1,rshCharge*2).toFixed(3) : 0;
 }
 
-function startApp() {
-  document.getElementById('start-screen').style.display = 'none';
+const handsMP = new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+handsMP.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.6});
+handsMP.onResults(onResults);
 
-  const handsMP = new Hands({
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-  });
-  handsMP.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.70,
-    minTrackingConfidence: 0.60
-  });
-  handsMP.onResults(onResults);
+webcam.addEventListener('loadedmetadata', () => {
+  feed.width  = webcam.videoWidth  || 1280;
+  feed.height = webcam.videoHeight || 720;
+});
 
-  const cam = new Camera(webcam, {
-    onFrame: async () => { await handsMP.send({ image: webcam }); },
-    width: 1280, height: 720
-  });
-  cam.start();
-
-  rasVid.play().catch(() => {});
-  rshVid.play().catch(() => {});
+async function tick() {
+  if(webcam.readyState >= 2) {
+    feed.width  = webcam.videoWidth  || 1280;
+    feed.height = webcam.videoHeight || 720;
+    feedCtx.drawImage(webcam, 0, 0, feed.width, feed.height);
+    await handsMP.send({image: feed});
+  }
+  requestAnimationFrame(tick);
 }
 
-document.addEventListener('keydown', e => {
-  const k = e.key.toUpperCase();
-  if (k === 'Q' || e.key === 'Escape') window.close();
-  if (k === 'M') {
-    manualMode = manualMode === null ? 'R' : manualMode === 'R' ? 'S' : null;
-    console.log(manualMode === null ? 'AUTO' : manualMode === 'R' ? 'RASENGAN (manual)' : 'RASENSHURIKEN (manual)');
-  }
+navigator.mediaDevices.getUserMedia({video:{width:1280,height:720},audio:false}).then(stream=>{
+  webcam.srcObject=stream;
+  webcam.play();
+  rasVid.play().catch(()=>{});
+  rshVid.play().catch(()=>{});
+  requestAnimationFrame(tick);
 });
 </script>
 </body>
